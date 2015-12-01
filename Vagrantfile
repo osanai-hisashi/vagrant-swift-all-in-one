@@ -36,8 +36,6 @@ extra_vms = Integer(ENV['EXTRA_VMS'] || 0)
 end
 
 current_datetime = Time.now.strftime('%Y%m%d-%H%M%S')
-http_proxy = ENV['HTTP_PROXY']
-https_proxy = ENV['HTTPS_PROXY']
 
 local_config = {
   'full_reprovision' => (ENV['FULL_REPROVISION'] || 'false').downcase == 'true',
@@ -77,11 +75,9 @@ local_config = {
 
 
 Vagrant.configure('2') do |global_config|
-  if http_proxy then
-    global_config.proxy.http = http_proxy
-  end
-  if https_proxy then
-    global_config.proxy.https = https_proxy
+  if Vagrant.has_plugin?('vagrant-proxyconf')
+    global_config.proxy.http = ENV['HTTP_PROXY']
+    global_config.proxy.https = ENV['HTTPS_PROXY']
   end
   global_config.ssh.forward_agent = true
   hosts.each do |vm_name, ip|
@@ -105,13 +101,15 @@ Vagrant.configure('2') do |global_config|
         end
       end
 
-      if global_config.proxy.http or global_config.proxy.https then
-        config.vm.provision 'shell', inline: <<-SHELL
-          rm -vrf /var/lib/apt/lists/*
-          apt-get update
-          apt-get install -y git-core
-          git config --global url.'https://'.insteadOf git://
-        SHELL
+      if Vagrant.has_plugin?('vagrant-proxyconf')
+        if global_config.proxy.http or global_config.proxy.https
+          config.vm.provision 'shell', inline: <<-SHELL
+            rm -vrf /var/lib/apt/lists/*
+            apt-get update
+            apt-get install -y git-core
+            git config --global url.'https://'.insteadOf git://
+          SHELL
+        end
       end
 
       config.vm.provision :chef_solo do |chef|
@@ -122,11 +120,13 @@ Vagrant.configure('2') do |global_config|
         chef.json = local_config
       end
 
-      if global_config.proxy.http or global_config.proxy.https then
-        config.vm.provision 'shell', inline: <<-SHELL
-          mv /etc/environment /etc/environment_bk
-          mv /etc/profile.d/proxy.sh /home/vagrant/proxy_bk.sh
-        SHELL
+      if Vagrant.has_plugin?('vagrant-proxyconf')
+        if global_config.proxy.http or global_config.proxy.https
+          config.vm.provision 'shell', inline: <<-SHELL
+            mv /etc/environment /etc/environment_bk
+            mv /etc/profile.d/proxy.sh /home/vagrant/proxy_bk.sh
+          SHELL
+        end
       end
 
       if local_config['keystone_auth_provision']
