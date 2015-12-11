@@ -32,6 +32,9 @@ current = //TEST/SAIO
 [filter:staticweb]
 use = egg:swift#staticweb
 
+[filter:container-quotas]
+use = egg:swift#container_quotas
+
 [app:proxy-server]
 use = egg:swift#proxy
 allow_account_management = true
