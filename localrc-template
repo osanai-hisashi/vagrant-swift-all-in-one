@@ -25,6 +25,7 @@ export OBJECT_SYNC_METHOD=rsync  # or ssync
 export POST_AS_COPY=true  # or false
 export KEYSTONE_AUTH_PROVISION=false  # or true
 export KEYSTONE_REGISTER_DATA_METHOD="curl" # openstack-client or curl
+export KEYSTONE_BOOTSTRAP=true # necessary to M release
 # git repos
 export SWIFT_REPO=git://github.com/openstack/swift.git
 export SWIFT_REPO_BRANCH=master

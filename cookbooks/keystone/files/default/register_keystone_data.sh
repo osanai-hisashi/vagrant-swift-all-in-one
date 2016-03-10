@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (c) 2015 Fujitsu, Inc.
+# Copyright (c) 2016 Fujitsu, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,10 +16,19 @@
 
 echo "===> Start initial settings for swift function_test"
 WORK_DIR="/vagrant/scripts"
+USER_JSON_PATH=$1
 
 # Prepare
 apt-get install -y jq
 unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
+
+# Get Token
+file ${USER_JSON_PATH}
+if [ $? -eq 0 ]; then
+  TOKEN=`curl -isS -X POST http://localhost:5000/v3/auth/tokens -H "Content-Type: application/json" -H "Accept: application/json" -T ${USER_JSON_PATH} --no-proxy localhost:5000 |grep "X-Subject-Token"|awk '{print $2}'| tr -d '\r'`
+else
+  TOKEN="ADMIN"
+fi
 
 # Create domain (test-domain)
 sed -e s/@DOMAIN_NAME@/test-domain/g ${WORK_DIR}/domain_template.json >${WORK_DIR}/test_domain.json

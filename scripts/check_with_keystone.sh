@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (c) 2015 Fujitsu, Inc.
+# Copyright (c) 2016 Fujitsu, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 # Prepare
 unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
 WORK_DIR="/vagrant/scripts"
-KEYSTONE_ADMIN_TOKEN=ADMIN
+KEYSTONE_ADMIN_TOKEN=$TOKEN
 ADMIN_PROJECT_ID=$(curl -sS -X GET http://127.0.0.1:35357/v3/projects?name=admin -H "X-Auth-Token: ${KEYSTONE_ADMIN_TOKEN}" | jq .projects[].id | tr -d '"')
 TEST_PROJECT_ID=$(curl -sS -X GET http://127.0.0.1:35357/v3/projects?name=test -H "X-Auth-Token: ${KEYSTONE_ADMIN_TOKEN}" | jq .projects[].id | tr -d '"')
 TEST2_PROJECT_ID=$(curl -sS -X GET http://127.0.0.1:35357/v3/projects?name=test2 -H "X-Auth-Token: ${KEYSTONE_ADMIN_TOKEN}" | jq .projects[].id | tr -d '"')

@@ -1,4 +1,4 @@
-# Copyright (c) 2015 Fujitsu, Inc.
+# Copyright (c) 2016 Fujitsu, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,9 +13,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-execute "keystone-configuring" do
-  command "cp #{node['source_root']}/keystone/etc/keystone.conf.sample #{node['source_root']}/keystone/etc/keystone.conf"
-  not_if { File.exists?("#{node['source_root']}/keystone/etc/keystone.conf")}
+keystone_etc_dir = "#{node['source_root']}/keystone/etc"
+
+if node['keystone_bootstrap'] then
+  # Setup for keystone_bootstrap
+  template "#{keystone_etc_dir}/keystone.conf" do
+    source "keystone.conf.erb"
+    owner 'vagrant'
+    group 'vagrant'
+    mode '0644'
+    variables({
+      :keystone_db_dir => keystone_etc_dir
+    })
+  end
+else
+  # Copy from sample file
+  execute "keystone-configuring" do
+    command "cp #{keystone_etc_dir}/keystone.conf.sample #{keystone_etc_dir}/keystone.conf"
+    not_if { File.exists?("#{keystone_etc_dir}/keystone.conf")}
+  end
 end
 
 bash 'set_cron' do
@@ -26,12 +42,3 @@ bash 'set_cron' do
   not_if "grep '@hourly' /var/spool/cron/crontabs/keystone"
 end
 
-execute "keystone-start" do
-  command "/usr/local/bin/keystone-all --config-file #{node['source_root']}/keystone/etc/keystone.conf &"
-  only_if { File.exists?("#{node['source_root']}/keystone/etc/keystone.conf")}
-end
-
-execute "populate_identity_service" do
-  command '/usr/local/bin/keystone-manage db_sync'
-  only_if { File.exists?("#{node['source_root']}/keystone/etc/keystone.conf")}
-end

@@ -72,6 +72,7 @@ local_config = {
   'openstackclient_repo_branch' => (ENV['OPENSTACKCLIENT_REPO_BRANCH'] || 'master'),
   'extra_key' => (ENV['EXTRA_KEY'] || ''),
   'source_root' => (ENV['SOURCE_ROOT'] || '/vagrant'),
+  'keystone_bootstrap' => (ENV['KEYSTONE_BOOTSTRAP'] || 'false').downcase == 'true',
 }
 
 
@@ -133,11 +134,6 @@ Vagrant.configure('2') do |global_config|
           SHELL
         end
       end
-
-      if local_config['keystone_auth_provision']
-        config.vm.provision 'shell', path: 'scripts/register_keystone_data.sh'
-      end
-
     end
   end
 end

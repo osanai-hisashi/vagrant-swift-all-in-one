@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (c) 2015 Fujitsu, Inc.
+# Copyright (c) 2016 Fujitsu, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,13 +16,19 @@
 
 echo "===> Start initial settings for swift function_test"
 WORK_DIR="/vagrant/scripts"
+USER_JSON_PATH=$1
 
 # Prepare
 apt-get install -y jq
 unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
 
 # Get Token
-TOKEN=ADMIN
+file ${USER_JSON_PATH}
+if [ $? -eq 0 ]; then
+  TOKEN=`curl -isS -X POST http://localhost:5000/v3/auth/tokens -H "Content-Type: application/json" -H "Accept: application/json" -T ${USER_JSON_PATH} --no-proxy localhost:5000 |grep "X-Subject-Token"|awk '{print $2}'| tr -d '\r'`
+else
+  TOKEN="ADMIN"
+fi
 
 # Create Region(RegionOne)
 REGION_ID="RegionOne"
@@ -52,6 +58,10 @@ SWIFT_ID=$(curl -sS -X POST http://127.0.0.1:35357/v3/users -H "X-Auth-Token: ${
 sed -e s/@ROLE_NAME@/admin/g ${WORK_DIR}/role_template.json >${WORK_DIR}/admin_role.json
 sed -e 's/@ROLE_NAME@/_member_/g' ${WORK_DIR}/role_template.json >${WORK_DIR}/member_role.json
 ADMIN_ROLE_ID=$(curl -sS -X POST http://127.0.0.1:5000/v3/roles -H "X-Auth-Token: ${TOKEN}" -H "Content-Type: application/json" -H "Accept: application/json" -T ${WORK_DIR}/admin_role.json | jq .role.id |tr -d '"')
+# If generating keystone initial data by keystone-manage bootstrap, admin role already exists
+if [ "${ADMIN_ROLE_ID}" != "" -o "${ADMIN_ROLE_ID}" = "null" ]; then
+  ADMIN_ROLE_ID=$(curl -sS -X GET http://127.0.0.1:5000/v3/roles?name=admin -H "X-Auth-Token: ${TOKEN}" -H "Content-Type: application/json" -H "Accept: application/json" |jq .roles[].id|tr -d '"')
+fi
 MEMBER_ROLE_ID=$(curl -sS -X POST http://127.0.0.1:5000/v3/roles -H "X-Auth-Token: ${TOKEN}" -H "Content-Type: application/json" -H "Accept: application/json" -T ${WORK_DIR}/member_role.json | jq .role.id |tr -d '"')
 
 ############################

@@ -1,0 +1,8 @@
+#!/bin/bash
+KEYSTONE_DB_FILE="/home/vagrant/keystone/etc/keystone.db"
+ps -ef |grep keystone |grep -v grep|awk NR==1|awk '{print $2}'|xargs -i kill -9 {}
+ps -ef |grep keystone |grep -v grep|awk NR==1|awk '{print $2}'|xargs -i kill -9 {}
+rm -f ${KEYSTONE_DB_FILE}
+
+cd /tmp/vagrant-chef; chef-solo -c solo.rb -j dna.json -o keystone::data
+

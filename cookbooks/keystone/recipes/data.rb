@@ -1,4 +1,4 @@
-# Copyright (c) 2015 Fujitsu, Inc.
+# Copyright (c) 2016 Fujitsu, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,19 +12,78 @@
 # implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+require "mixlib/shellout"
 
+keystone_etc_dir = "#{node['source_root']}/keystone/etc"
+
+# Create identity database
+execute "populate_identity_service" do
+  command '/usr/local/bin/keystone-manage db_sync'
+  cwd keystone_etc_dir
+  not_if { File.exists?("#{keystone_etc_dir}/keystone.db")}
+end
+
+if node['keystone_bootstrap'] then
+  os_bootstrap_username ="admin_token_user"
+  os_bootstrap_password = "admin_token_user_password"
+  os_bootstrap_project_name = "admin_token_project"
+  os_bootstrap_role_name = "admin"
+  if node['keystone_bootstrap'] then
+    execute "keystone-manage bootstrap" do
+      command '/usr/local/bin/keystone-manage bootstrap'
+      cwd keystone_etc_dir
+      only_if { File.exists?("#{keystone_etc_dir}/keystone.db")}
+      environment ({
+        "OS_BOOTSTRAP_USERNAME" =>"#{os_bootstrap_username}",
+        "OS_BOOTSTRAP_PASSWORD" =>"#{os_bootstrap_password}",
+        "OS_BOOTSTRAP_PROJECT_NAME" =>"#{os_bootstrap_project_name}",
+        "OS_BOOTSTRAP_ROLE_NAME" =>"#{os_bootstrap_role_name}"
+      })
+    end
+  end
+end
+
+execute "keystone-start" do
+  command "/usr/local/bin/keystone-all --config-file #{keystone_etc_dir}/keystone.conf --logfile /var/log/keystone.log &"
+  cwd "/"
+  only_if { File.exists?("#{keystone_etc_dir}/keystone.conf")}
+end
+
+execute "wait keystone-start" do
+  command "sleep 5s"
+end
+
+# Get Token
+if node['keystone_bootstrap'] then
+  # Get token from keystone bootstrap user
+  template "/tmp/get_token.json" do
+    source "get_token.json.erb"
+    owner 'vagrant'
+    group 'vagrant'
+    mode '0644'
+    variables({
+      :domain_name => 'Default',
+      :username => "#{os_bootstrap_username}",
+      :password => "#{os_bootstrap_password}",
+      :project_name => "#{os_bootstrap_project_name}"
+    })
+  end
+end
+
+# Insert keystone initial data
 if node['keystone_register_data_method'] == 'curl' then
   cookbook_file '/tmp/register_keystone_initial_data.sh' do
     mode 0744
   end
 
-  bash 'register swift initial data to keystone by curl' do
+  execute 'register swift initial data to keystone by curl' do
+    command "bash /tmp/register_keystone_initial_data.sh /tmp/get_token.json"
     user "root"
-    code <<-EOC
-      unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
-      sh /tmp/register_keystone_initial_data.sh
-      rm -f register_keystone_initial_data.sh
-    EOC
+    only_if { File.exists?("#{keystone_etc_dir}/keystone.db")}
+  end
+
+  cookbook_file '/tmp/register_keystone_initial_data.sh' do
+    action :delete
   end
 else
   bash 'register keystone initial data by openstack-client' do
@@ -49,7 +108,8 @@ else
       openstack endpoint create --publicurl http://127.0.0.1:5000/v2.0  --internalurl http://127.0.0.1:5000/v2.0  --adminurl http://127.0.0.1:35357/v2.0  --region RegionOne keystone
 
     EOC
-    environment "OS_TOKEN" =>'ADMIN', "OS_AUTH_URL" =>'http://127.0.0.1:35357/v2.0'
+    environment "OS_TOKEN" =>"#{token}", "OS_AUTH_URL" =>'http://127.0.0.1:35357/v2.0'
+    only_if { File.exists?("#{keystone_etc_dir}/keystone.db")}
   end
 
   bash 'register swift initial data to keystone' do
@@ -61,7 +121,23 @@ else
       openstack service create --type object-store --description "OpenStack Object Storage" swift
       openstack endpoint create --publicurl 'http://127.0.0.1:8080/v1/AUTH_%(tenant_id)s'  --internalurl 'http://127.0.0.1:8080/v1/AUTH_%(tenant_id)s'  --adminurl 'http://127.0.0.1:8080' --region RegionOne swift
     EOC
-    environment "OS_TOKEN" =>'ADMIN', "OS_AUTH_URL" =>'http://127.0.0.1:35357/v2.0'
+    environment "OS_TOKEN" =>"#{token}", "OS_AUTH_URL" =>'http://127.0.0.1:35357/v2.0'
+    only_if { File.exists?("#{keystone_etc_dir}/keystone.db")}
   end
+end
+
+# For function test data
+cookbook_file '/tmp/register_keystone_data.sh' do
+  mode 0744
+end
+
+execute 'register data to keystone by curl for swift function test' do
+  command "bash /tmp/register_keystone_data.sh /tmp/get_token.json"
+  user "root"
+  only_if { File.exists?("#{keystone_etc_dir}/keystone.db")}
+end
+
+cookbook_file '/tmp/register_keystone_data.sh' do
+  action :delete
 end
 
